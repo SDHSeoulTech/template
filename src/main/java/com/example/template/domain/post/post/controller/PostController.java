@@ -1,56 +1,32 @@
 package com.example.template.domain.post.post.controller;
 
 import com.example.template.domain.post.post.entity.Post;
+import com.example.template.domain.post.post.service.PostService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.hibernate.validator.constraints.Length;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/posts")
+@RequiredArgsConstructor
 public class PostController {
 
-    private List<Post> posts = new ArrayList();
-    private long lastId = 3L;
-
-    public PostController() {
-        Post p1 = Post.builder()
-                .id(1L)
-                .title("title1")
-                .content("title1")
-                .build();
-
-        Post p2 = Post.builder()
-                .id(2L)
-                .title("title2")
-                .content("title2")
-                .build();
-
-        Post p3 = Post.builder()
-                .id(3L)
-                .title("title3")
-                .content("title3")
-                .build();
-
-        posts.add(p1);
-        posts.add(p2);
-        posts.add(p3);
-    }
+   private final PostService postService;
 
     @GetMapping("/write")
-    public String showWrite() {
+    public String showWrite(WriteForm form, BindingResult bindingResult) {
         return "domain/post/post/write";
     }
 
@@ -68,63 +44,30 @@ public class PostController {
 
     // @ResponseBody를 빼면 반환값을 템플릿으로 인식한다.
     @PostMapping("/write")
-    public String doWrite(@Valid WriteForm form, BindingResult bindingResult,
-                          Model model) {
+    public String doWrite(@Valid WriteForm form, BindingResult bindingResult) {
 
         if (bindingResult.hasErrors()) {
-
-            String errorMessage = bindingResult.getFieldErrors()
-                    .stream()
-                    .map(err -> err.getDefaultMessage())
-                    .sorted()
-                    .map(msg -> msg.split("-")[1])
-                    .collect(Collectors.joining("<br>"));
-
-            model.addAttribute("errorMessage", errorMessage);
-
             return "domain/post/post/write";
         }
 
-        Post post = Post.builder()
-                .id(++lastId)
-                .title(form.getTitle())
-                .content(form.getContent())
-                .build();
-
-        posts.add(post);
+        postService.write(form.getTitle(),form.getContent());
 
         return "redirect:/posts"; //리다이렉트
     }
 
-    private String getFormHtml(String errorMsg, String title, String content) {
-        return """
-                <div>%s</div>
-                <form method="post">
-                  <input type="text" name="title" placeholder="제목" value="%s"/> <br>
-                  <textarea name="content">%s</textarea> <br>
-                  <input type="submit" value="등록" /> <br>
-                </form>
-                """.formatted(errorMsg, title, content);
-    }
 
     @GetMapping
-    @ResponseBody
-    private String showList() {
+    private String showList(Model model) {
+        List<Post> posts = postService.getItems();
+        model.addAttribute("posts", posts);
+        return "domain/post/post/list";
+    }
 
-        String lis = posts.stream()
-                .map(p -> "<li>" + p.getTitle() + "</li>")
-                .collect(Collectors.joining());
-
-        String ul = "<ul>" + lis + "</ul>";
-
-
-        return """
-                <div>글 목록</div>
-                
-                %s
-                
-                <a href="/posts/write">글쓰기</a>
-                """.formatted(ul);
+    @GetMapping("/detail/{id}")
+    private String detail(@PathVariable long id, Model model) {
+        Post post = postService.getItem(id).get();
+        model.addAttribute("post", post);
+        return "domain/post/post/detail";
     }
 
 
